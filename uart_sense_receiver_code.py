@@ -14,7 +14,7 @@ from adafruit_ble.services.standard.device_info import DeviceInfoService
 
 from adafruit_bluefruit_connect.packet import Packet
 
-from sensor_packet import SensorPacket
+from uart_sensor_packet import SensorPacket
 
 
 def byte_string(s):

@@ -14,7 +14,7 @@ from adafruit_ble.services.standard.device_info import DeviceInfoService
 
 from adafruit_bluefruit_connect.packet import Packet
 
-from sensor_packet import SensorPacket
+from uart_sensor_packet import SensorPacket
 from sensors import Sensors
 
 import name
@@ -23,6 +23,10 @@ import name
 def byte_string(s):
     return "".join("%02x" % b for b in s)
 
+def ToSensorPacket(sensors):
+    return SensorPacket(name.kBoardId, sensors.getTemperature(),
+                        sensors.getBaroPressure(), sensors.getHumidity(),
+                        *sensors.getColors())
 
 ble = BLERadio()
 
@@ -48,7 +52,7 @@ while True:
         ble.stop_scan()
 
     while uart_connection and uart_connection.connected:
-        packet = sensors.toSensorPacket(name.kBoardId)
+        packet = ToSensorPacket(sensors)
         print(
                 f"Sending Packet from {packet.board_id:02x}: {packet.temperature:.2f} *C, "
                 f"{packet.pressure/100:.2f} HPa, "
