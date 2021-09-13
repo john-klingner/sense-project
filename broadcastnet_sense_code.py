@@ -6,27 +6,24 @@
 
 import time
 
-import adafruit_ble_broadcastnet
+import sensor_measurement
 from sensors import Sensors
 import name
 
 def ToSensorMeasurement(sensors):
-    measurement = adafruit_ble_broadcastnet.AdafruitSensorMeasurement()
+    measurement = sensor_measurement.SensorMeasurement()
     measurement.temperature = sensors.getTemperature()
-    measurement.relative_humidity = sensors.getHumidity()
     measurement.pressure = sensors.getBaroPressure()
-    measurement.acceleration = sensors.getAccel()
-    measurement.magnetic = sensors.getMagnetic()
-    measurement.gyro = sensors.getGyro()
-    # Using 'value' for board id
-    measurement.value = name.kBoardId
+    measurement.relative_humidity =sensors.getHumidityShort()
+    measurement.color = sensors.getColors()
+    measurement.boardId = name.kBoardId
     return measurement
     
-print("This is BroadcastNet sensor:", adafruit_ble_broadcastnet.device_address)
+print("This is BroadcastNet sensor:", sensor_measurement.device_address)
 sensors = Sensors()
 
 while True:
     measurement = ToSensorMeasurement(sensors)
     print(measurement)
-    adafruit_ble_broadcastnet.broadcast(measurement)
+    sensor_measurement.broadcast(measurement)
     time.sleep(4)

@@ -57,7 +57,13 @@ class Sensors:
         return self.apds9960.proximity
 
     def getColors(self):
-        return self.apds9960.color_data
+        r,g,b,c = self.apds9960.color_data
+        # Correct for intensity variation of sensor according to datasheet.
+        r = min(65535, int(r*1.333))
+        g = min(65535, int(g*1.333))
+        b = min(65535, int(b*2.778))
+        return [r,g,b,c]
+
 
     def getTemperature(self):
         return self.bmp280.temperature
@@ -86,6 +92,9 @@ class Sensors:
 
     def getHumidity(self):
         return self.sht31d.relative_humidity
+
+    def getHumidityShort(self):
+        return min(65535, max(0, int(self.getHumidity()*655.35)))
 
     def getLoudness(self):
         samples = array.array("H", [0] * int(kMicSampleFrequency * kMicSampleDurationS))

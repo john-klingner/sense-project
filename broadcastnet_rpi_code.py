@@ -112,49 +112,50 @@ print("scanning")
 print()
 sequence_numbers = {}
 # By providing Advertisement as well we include everything, not just specific advertisements.
-for measurement in ble.start_scan(
-    adafruit_ble_broadcastnet.AdafruitSensorMeasurement, interval=0.5
-):
-    reversed_address = [measurement.address.address_bytes[i] for i in range(5, -1, -1)]
-    sensor_address = "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}".format(*reversed_address)
-    if sensor_address not in sequence_numbers:
-        sequence_numbers[sensor_address] = measurement.sequence_number - 1 % 256
-    # Skip if we are getting the same broadcast more than once.
-    if measurement.sequence_number == sequence_numbers[sensor_address]:
-        continue
-    number_missed = measurement.sequence_number - sequence_numbers[sensor_address] - 1
-    if number_missed < 0:
-        number_missed += 256
-    group_key = "bridge-{}-sensor-{}".format(bridge_address, sensor_address)
-    if sensor_address not in existing_feeds:
-        create_group("Bridge {} Sensor {}".format(bridge_address, sensor_address))
-        create_feed(group_key, "Missed Message Count")
-        existing_feeds[sensor_address] = ["missed-message-count"]
+while True:
+    for measurement in ble.start_scan(
+        adafruit_ble_broadcastnet.AdafruitSensorMeasurement, interval=0.5
+    ):
+        reversed_address = [measurement.address.address_bytes[i] for i in range(5, -1, -1)]
+        sensor_address = "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}".format(*reversed_address)
+        if sensor_address not in sequence_numbers:
+            sequence_numbers[sensor_address] = measurement.sequence_number - 1 % 256
+        # Skip if we are getting the same broadcast more than once.
+        if measurement.sequence_number == sequence_numbers[sensor_address]:
+            print("Skipping: ")
+            print(measurement)
+            continue
+        number_missed = measurement.sequence_number - sequence_numbers[sensor_address] - 1
+        if number_missed < 0:
+            number_missed += 256
+        group_key = "bridge-{}-sensor-{}".format(bridge_address, sensor_address)
+        if sensor_address not in existing_feeds:
+            create_group("Bridge {} Sensor {}".format(bridge_address, sensor_address))
+            create_feed(group_key, "Missed Message Count")
+            existing_feeds[sensor_address] = ["missed-message-count"]
 
-    data = [{"key": "missed-message-count", "value": number_missed}]
-    for attribute in dir(measurement.__class__):
-        attribute_instance = getattr(measurement.__class__, attribute)
-        if issubclass(attribute_instance.__class__, ManufacturerDataField):
-            if attribute != "sequence_number":
-                values = getattr(measurement, attribute)
-                if values is not None:
-                    data.extend(
-                        convert_to_feed_data(values, attribute, attribute_instance)
-                    )
+        data = [{"key": "missed-message-count", "value": number_missed}]
+        for attribute in dir(measurement.__class__):
+            attribute_instance = getattr(measurement.__class__, attribute)
+            if issubclass(attribute_instance.__class__, ManufacturerDataField):
+                if attribute != "sequence_number":
+                    values = getattr(measurement, attribute)
+                    if values is not None:
+                        data.extend(
+                            convert_to_feed_data(values, attribute, attribute_instance)
+                        )
 
-    for feed_data in data:
-        if feed_data["key"] not in existing_feeds[sensor_address]:
-            create_feed(group_key, feed_data["key"])
-            existing_feeds[sensor_address].append(feed_data["key"])
+        for feed_data in data:
+            if feed_data["key"] not in existing_feeds[sensor_address]:
+                create_feed(group_key, feed_data["key"])
+                existing_feeds[sensor_address].append(feed_data["key"])
 
-    start_time = time.monotonic()
-    print(group_key, data)
-    # Only update the previous sequence if we logged successfully.
-    if create_data(group_key, data):
-        sequence_numbers[sensor_address] = measurement.sequence_number
+        start_time = time.monotonic()
+        print(group_key, data)
+        # Only update the previous sequence if we logged successfully.
+        if create_data(group_key, data):
+            sequence_numbers[sensor_address] = measurement.sequence_number
 
-    duration = time.monotonic() - start_time
-    print("Done logging measurement to IO. Took {} seconds".format(duration))
-    print()
-
-print("scan done")
+        duration = time.monotonic() - start_time
+        print("Done logging measurement to IO. Took {} seconds".format(duration))
+        print()
