@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "dummy hcitool; exit 1"
+exit 1
