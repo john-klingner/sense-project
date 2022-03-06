@@ -28,4 +28,4 @@ while True:
     measurement = ToSensorMeasurement(sensors)
     print(measurement)
     adafruit_ble_broadcastnet.broadcast(measurement)
-    time.sleep(4)
+    time.sleep(10)
