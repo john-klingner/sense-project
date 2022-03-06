@@ -49,8 +49,8 @@ class Sensors:
         )
         print(
             f"Sensors initialized! Initial Value:\n"
-            f"{self.getEnvironmentalAsVector()}\n"
-            f"{self.get9DoF()}"
+           # f"{self.getEnvironmentalAsVector()}\n"
+           # f"{self.get9DoF()}"
         )
 
     def getProximity(self):

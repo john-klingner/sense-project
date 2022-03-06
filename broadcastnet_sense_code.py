@@ -1,29 +1,31 @@
 # SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
 # SPDX-License-Identifier: MIT
 
-"""This is a complex sensor node that uses the sensors 
+"""This is a complex sensor node that uses the sensors
    on a Clue and Feather Bluefruit Sense."""
 
 import time
 
-import sensor_measurement
+#import sensor_measurement
+
 from sensors import Sensors
 import name
+import adafruit_ble_broadcastnet
 
 def ToSensorMeasurement(sensors):
-    measurement = sensor_measurement.SensorMeasurement()
+    measurement = adafruit_ble_broadcastnet.AdafruitSensorMeasurement()
     measurement.temperature = sensors.getTemperature()
     measurement.pressure = sensors.getBaroPressure()
-    measurement.relative_humidity =sensors.getHumidityShort()
-    measurement.color = sensors.getColors()
-    measurement.boardId = name.kBoardId
+    measurement.relative_humidity = sensors.getHumidityShort()
+    #measurement.color = sensors.getColors()
+    measurement.value = name.kBoardId
     return measurement
-    
-print("This is BroadcastNet sensor:", sensor_measurement.device_address)
+
+print("This is BroadcastNet sensor:", adafruit_ble_broadcastnet.device_address)
 sensors = Sensors()
 
 while True:
     measurement = ToSensorMeasurement(sensors)
     print(measurement)
-    sensor_measurement.broadcast(measurement)
+    adafruit_ble_broadcastnet.broadcast(measurement)
     time.sleep(4)

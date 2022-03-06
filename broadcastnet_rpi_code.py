@@ -134,7 +134,7 @@ while True:
             create_feed(group_key, "Missed Message Count")
             existing_feeds[sensor_address] = ["missed-message-count"]
 
-        data = [{"key": "missed-message-count", "value": number_missed}]
+        data = []
         for attribute in dir(measurement.__class__):
             attribute_instance = getattr(measurement.__class__, attribute)
             if issubclass(attribute_instance.__class__, ManufacturerDataField):
