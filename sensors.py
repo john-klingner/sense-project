@@ -24,7 +24,8 @@ def normalized_rms(values):
     minbuf = int(sum(values) / len(values))
     return int(
         math.sqrt(
-            sum(float(sample - minbuf) * (sample - minbuf) for sample in values)
+            sum(float(sample - minbuf) * (sample - minbuf)
+                for sample in values)
             / len(values)
         )
     )
@@ -47,23 +48,18 @@ class Sensors:
             sample_rate=kMicSampleFrequency,
             bit_depth=16,
         )
-        print(
-            f"Sensors initialized! Initial Value:\n"
-           # f"{self.getEnvironmentalAsVector()}\n"
-           # f"{self.get9DoF()}"
-        )
+        print("Sensors initialized!")
 
     def getProximity(self):
         return self.apds9960.proximity
 
     def getColors(self):
-        r,g,b,c = self.apds9960.color_data
+        r, g, b, c = self.apds9960.color_data
         # Correct for intensity variation of sensor according to datasheet.
         r = min(65535, int(r*1.333))
         g = min(65535, int(g*1.333))
         b = min(65535, int(b*2.778))
-        return [r,g,b,c]
-
+        return [r, g, b, c]
 
     def getTemperature(self):
         return self.bmp280.temperature
@@ -97,7 +93,8 @@ class Sensors:
         return min(65535, max(0, int(self.getHumidity()*655.35)))
 
     def getLoudness(self):
-        samples = array.array("H", [0] * int(kMicSampleFrequency * kMicSampleDurationS))
+        samples = array.array(
+            "H", [0] * int(kMicSampleFrequency * kMicSampleDurationS))
         self.microphone.record(samples, len(samples))
         return normalized_rms(samples)
 
