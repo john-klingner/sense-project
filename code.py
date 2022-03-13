@@ -7,7 +7,6 @@
 import time
 
 from sensors import Sensors
-import name
 import adafruit_ble_broadcastnet
 
 
