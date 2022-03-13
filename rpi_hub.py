@@ -83,6 +83,9 @@ def convert_to_feed_data(values, attribute_name, attribute_instance):
                     }
                 )
         else:
+            if key == "temperature":
+                # Convert to fahrenheit.
+                value = (value*1.8)+32.0
             feed_data.append({"key": key, "value": value})
     return feed_data
 
