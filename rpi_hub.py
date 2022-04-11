@@ -11,6 +11,17 @@ import adafruit_ble
 import adafruit_ble_broadcastnet
 import logging
 
+def GetIdByte(measurement):
+    if measurement.address is None:
+        return 0xFF
+    return measurement.address.address_bytes[0]
+
+def ToId(id_byte):
+    return "{:02x}".format(id_byte)
+
+def GetId(measurement):
+    return ToId(GetIdByte(measurement))
+
 logging.basicConfig(format="[%(levelname)s] %(asctime)s: %(message)s",
                     level=logging.INFO)
 
@@ -90,14 +101,6 @@ def convert_to_feed_data(values, attribute_name, attribute_instance):
     return feed_data
 
 
-def GetId(measurement):
-    reversed_address = [measurement.address.address_bytes[i]
-                        for i in range(5, -1, -1)]
-    sensor_address = "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}".format(
-        *reversed_address)
-    return "{:02x}".format(reversed_address[-1])
-
-
 ble = adafruit_ble.BLERadio()
 bridge_address = adafruit_ble_broadcastnet.device_address
 logging.info("This is BroadcastNet bridge:{}\n".format(bridge_address))
@@ -128,7 +131,7 @@ sequence_numbers = {}
 # By providing Advertisement as well we include everything, not just specific advertisements.
 while True:
     for measurement in ble.start_scan(
-        adafruit_ble_broadcastnet.AdafruitSensorMeasurement, interval=0.5
+        adafruit_ble_broadcastnet.AdafruitSensorMeasurement, interval=0.1, timeout=10, minimum_rssi=-100
     ):
         sensor_id = GetId(measurement)
 
