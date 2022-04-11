@@ -130,17 +130,19 @@ logging.info("Scanning\n")
 sequence_numbers = {}
 # By providing Advertisement as well we include everything, not just specific advertisements.
 while True:
+    logging.info("Starting Scan")
     for measurement in ble.start_scan(
-        adafruit_ble_broadcastnet.AdafruitSensorMeasurement, interval=0.1, timeout=10, minimum_rssi=-100
+        adafruit_ble_broadcastnet.AdafruitSensorMeasurement, minimum_rssi=-100
     ):
         sensor_id = GetId(measurement)
-
+        logging.info("\tReceived {} from {}.".format(measurement, sensor_id))
         # Check sequence numbers.
         if sensor_id not in sequence_numbers:
+            logging.info("\t\tThis is a new sensor_id.")
             sequence_numbers[sensor_id] = measurement.sequence_number - 1 % 256
         # Skip if we are getting the same broadcast more than once.
         if measurement.sequence_number == sequence_numbers[sensor_id]:
-            logging.warning("Skipping: {}".format(measurement))
+            logging.warning("\t\tSkipping.")
             continue
 
         # Create Group if needed:
@@ -181,4 +183,4 @@ while True:
 
         duration = time.monotonic() - start_time
         logging.info(
-            "Done logging measurement to IO. Took {} seconds.\n".format(duration))
+            "\tDone logging measurement to IO. Took {} seconds.\n".format(duration))
