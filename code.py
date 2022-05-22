@@ -1,28 +1,34 @@
 # SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
 # SPDX-License-Identifier: MIT
-
 """This is a complex sensor node that uses the sensors
    on a Clue and Feather Bluefruit Sense."""
 
 import time
 
+from aio_interface import WifiIoMqttConnection
 from sensors import Sensors
-import adafruit_ble_broadcastnet
+import _bleio
 
 
-def ToSensorMeasurement(sensors):
-    measurement = adafruit_ble_broadcastnet.AdafruitSensorMeasurement()
-    measurement.temperature = sensors.getTemperature()
-    measurement.pressure = sensors.getBaroPressure()
-    measurement.relative_humidity = sensors.getHumidityShort()
-    return measurement
+def CollectMeasurements(sensors):
+    return {
+        #Convert temperature to fahrenheit.
+        "temperature": 32.0 + (1.8 * sensors.getTemperature()),
+        "pressure": sensors.getBaroPressure(),
+        "relative-humidity": sensors.getHumidityShort(),
+        "loudness": sensors.getLoudness(),
+    }
 
 
-print("This is BroadcastNet sensor:", adafruit_ble_broadcastnet.device_address)
+kMyIdByte = _bleio.adapter.address.address_bytes[0]
+kMyId = "{:02x}".format(kMyIdByte)
+kMyGroupKey = "sensor-" + kMyId
+
+print("This is BroadcastNet sensor:", kMyId)
 sensors = Sensors()
-
+connection = WifiIoMqttConnection()
 while True:
-    measurement = ToSensorMeasurement(sensors)
+    measurement = CollectMeasurements(sensors)
     print(measurement)
-    adafruit_ble_broadcastnet.broadcast(measurement)
+    connection.Publish(kMyGroupKey, measurement)
     time.sleep(10)

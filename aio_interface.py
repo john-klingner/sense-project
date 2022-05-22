@@ -1,112 +1,111 @@
-from secrets import secrets  # pylint: disable=no-name-in-module
 import time
-import requests
-import logging
+import board
+import busio
+from digitalio import DigitalInOut
+import neopixel
+from adafruit_esp32spi import adafruit_esp32spi
+from adafruit_esp32spi import adafruit_esp32spi_wifimanager
+import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
-aio_auth_header = {"X-AIO-KEY": secrets["aio_key"]}
-aio_base_url = "https://io.adafruit.com/api/v2/" + secrets["aio_username"]
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
+from adafruit_io.adafruit_io import IO_MQTT
+from adafruit_io.adafruit_io_errors import AdafruitIO_MQTTError
 
-def to_group_key(sensor_id): return "sensor-" + sensor_id
-
-def aio_post(path, **kwargs):
-    kwargs["headers"] = aio_auth_header
-    return requests.post(aio_base_url + path, **kwargs)
-
-def aio_get(path, **kwargs):
-    kwargs["headers"] = aio_auth_header
-    return requests.get(aio_base_url + path, **kwargs)
-
-def create_group(name):
-    response = aio_post("/groups", json={"name": name})
-    if response.status_code != 201:
-        raise RuntimeError("unable to create new group with name {}\n{}\n{}".format(
-            name, response.content, response.status_code))
-    return response.json()["key"]
+# Get wifi details and more from a secrets.py file
+try:
+    from secrets import secrets
+except ImportError:
+    print("WiFi secrets are kept in secrets.py, please add them there!")
+    raise
 
 
-def create_feed(sensor_id, name):
-    group_key = to_group_key(sensor_id)
-    response = aio_post(
-        "/groups/{}/feeds".format(group_key), json={"feed": {"name": name}}
-    )
-    if response.status_code != 201:
-        raise RuntimeError("unable to create new feed named {} in group {}.\n{}\n{}".format(
-            name, group_key, response.content, response.status_code))
-    return response.json()["key"]
+# Define callback methods which are called when events occur
+# pylint: disable=unused-argument, redefined-outer-name
+def connected(client, userdata, flags, rc):
+    # This function will be called when the client is connected
+    # successfully to the broker.
+    print("Connected to MQTT broker!")
+    # Subscribe to topics here.
 
-def ConvertToFeedData(values, attribute_name, attribute_instance):
-    feed_data = []
-    # Wrap single value entries for enumeration.
-    if not isinstance(values, tuple) or (
-        attribute_instance.element_count > 1 and not isinstance(
-            values[0], tuple)
-    ):
-        values = (values,)
-    for i, value in enumerate(values):
-        key = attribute_name.replace("_", "-")
-        if(len(values) > 1):
-            key = key + "-" + str(i)
-        if isinstance(value, tuple):
-            for j in range(attribute_instance.element_count):
-                feed_data.append(
-                    {
-                        "key": key + "-" + attribute_instance.field_names[j],
-                        "value": value[j],
-                    }
-                )
-        else:
-            if key == "temperature":
-                # Convert to fahrenheit.
-                value = (value*1.8)+32.0
-            feed_data.append({"key": key, "value": value})
-    return feed_data
 
-class AIOInterface:
-    existing_feeds = {}
+def disconnected(client, userdata, rc):
+    # This method is called when the client is disconnected
+    print("Disconnected from MQTT Broker!")
+
+
+def message(client, topic, message):
+    """Method callled when a client's subscribed feed has a new
+    value.
+    :param str topic: The topic of the feed with a new value.
+    :param str message: The new value
+    """
+    print("New message on topic {0}: {1}".format(topic, message))
+
+
+class WifiIoMqttConnection:
 
     def __init__(self):
-        logging.info("Fetching existing feeds.")
-        response = aio_get("/groups")
-        for group in response.json():
-            if "-" not in group["key"]:
-                continue
-            pieces = group["key"].split("-")
-            if len(pieces) != 2 or pieces[0] != "sensor":
-                continue
-            _, sensor_id = pieces
+        esp32_cs = DigitalInOut(board.D13)
+        esp32_reset = DigitalInOut(board.D12)
+        esp32_ready = DigitalInOut(board.D11)
 
-            logging.info("Found feed with id: {}.".format(sensor_id))
+        spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
+        esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready,
+                                               esp32_reset)
 
-            self.existing_feeds[sensor_id] = []
-            for feed in group["feeds"]:
-                feed_key = feed["key"].split(".")[-1]
-                self.existing_feeds[sensor_id].append(feed_key)
+        status_light = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.1)
+        self.wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(
+            esp, secrets, status_light)
 
-        logging.info("Existing Feeds:\n{}".format(self.existing_feeds))
+        print("Connecting to WiFi...")
+        self.wifi.connect()
+        print("Connected!")
+        time.sleep(0.1)
 
-    def CreateGroupIfNeeded(self, sensor_id):
-        if sensor_id not in self.existing_feeds:
-            logging.info("Sensor id ({}) not in existing feeds: {}".format(
-                sensor_id, self.existing_feeds))
-            create_group("Sensor " + sensor_id)
-            self.existing_feeds[sensor_id] = []
+        # Initialize MQTT interface with the esp interface
+        MQTT.set_socket(socket, esp)
 
-    def CreateFeedIfNeeded(self, feed_key, sensor_id):
-        if feed_key not in self.existing_feeds[sensor_id]:
-            logging.info("{} feed not in eisting feeds for {}.".format(feed_key, sensor_id))
-            create_feed(sensor_id, feed_key)
-            self.existing_feeds[sensor_id].append(feed_key)
+        mqtt_client = MQTT.MQTT(
+            broker="io.adafruit.com",
+            username=secrets["aio_username"],
+            password=secrets["aio_key"],
+        )
+        self.io = IO_MQTT(mqtt_client)
 
+        self.io.on_connect = connected
+        self.io.on_disconnect = disconnected
+        self.io.on_message = message
+        time.sleep(0.1)
+        self.Connect()
 
-    def LogData(self, data, sensor_id):
-        group_key = to_group_key(sensor_id)
-        response = aio_post("/groups/{}/data".format(group_key),
-                            json={"feeds": data})
-        if response.status_code == 429:
-            logging.warning("Throttled!")
-            return False
-        if response.status_code != 200:
-            raise RuntimeError("unable to create new data ({}) in group {}\n{}\n{}.".format(
-                data, group_key, response.status_code, response.json()))
-        response.close()
-        return True
+    def Connect(self):
+        try:
+            self.io.connect()
+            self.io.subscribe_to_throttling()
+        except AdafruitIO_MQTTError as err:
+            print("Failed to connect. Will retry.\n", err)
+
+    def OnLoop(self):
+        if self.io.is_connected():
+            try:
+                self.io.loop()
+            except (ValueError, RuntimeError) as e:
+                print("Failed to get data, retrying\n", e)
+                self.Reset()
+        else:
+            print("Not connected. Trying to connect in loop.\n")
+            self.Connect()
+
+    def Publish(self, group, values):
+        if not self.io.is_connected():
+            print("IO Connection not established. Skipping publish call.")
+            return
+        for (feed_name, value) in values.items():
+            try:
+                self.io.publish('.'.join([group, feed_name]), value)
+            except AdafruitIO_MQTTError as err:
+                print("Failed to publish.\n", err)
+
+    def Reset(self):
+        self.wifi.reset()
+        self.io.reconnect()
