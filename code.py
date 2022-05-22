@@ -15,7 +15,7 @@ def CollectMeasurements(sensors):
         #Convert temperature to fahrenheit.
         "temperature": 32.0 + (1.8 * sensors.getTemperature()),
         "pressure": sensors.getBaroPressure(),
-        "relative-humidity": sensors.getHumidityShort(),
+        "relative-humidity": sensors.getHumidity(),
         "loudness": sensors.getLoudness(),
     }
 
